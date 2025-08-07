@@ -410,10 +410,10 @@
   resolved "https://registry.yarnpkg.com/@esbuild/win32-x64/-/win32-x64-0.25.8.tgz#610d7ea539d2fcdbe39237b5cc175eb2c4451f9c"
   integrity sha512-cn3Yr7+OaaZq1c+2pe+8yxC8E144SReCQjN6/2ynubzYjvyqZjTXfQJpAcQpsdJq3My7XADANiYGHoFC69pLQw==
 
-"@hiraokahypertools/pst-extractor@^0.1.0-alpha.12":
-  version "0.1.0-alpha.12"
-  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst-extractor/-/pst-extractor-0.1.0-alpha.12.tgz#7359fe6d07905367dc8db30f02b4b7e5023606fb"
-  integrity sha512-E+ZcCc38o08dGbK9WrRsgZP6SQ9qjfTDmGeeupe0FZGa4xn+4ZL9cntiaJnWpk5m08hEKLSJ5cPLSM25CwRVmA==
+"@hiraokahypertools/pst-extractor@^0.1.0-alpha.14":
+  version "0.1.0-alpha.14"
+  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst-extractor/-/pst-extractor-0.1.0-alpha.14.tgz#7693a512a4f5b4ddc3ac10d530704723f0929af9"
+  integrity sha512-+pEg5JgL5Gu251PEfqE5nd3q/sW2BZev/sBWafiDqUYIt2eBFIbwfk+wSbSVbfSu+vQybLLtQNxQs8+Y3qtIkw==
   dependencies:
     iconv-lite "^0.6.3"
     long "^5.2.0"

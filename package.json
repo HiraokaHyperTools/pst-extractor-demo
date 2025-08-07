@@ -1,6 +1,6 @@
 {
   "name": "pst-extractor-demo",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
   "dependencies": {
     "@emotion/react": "latest",
     "@emotion/styled": "latest",
-    "@hiraokahypertools/pst-extractor": "^0.1.0-alpha.12",
+    "@hiraokahypertools/pst-extractor": "^0.1.0-alpha.14",
     "@mui/icons-material": "latest",
     "@mui/material": "latest",
     "react": "latest",

@@ -2,7 +2,7 @@ import * as React from 'react';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import { openPst, PSTAttachment, PSTFile, PSTFolder, PSTMessage } from '@hiraokahypertools/pst-extractor';
+import { Consts, openPst, PSTAttachment, PSTFile, PSTFolder, PSTMessage } from '@hiraokahypertools/pst-extractor';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Button from '@mui/material/Button';
@@ -207,9 +207,9 @@ export default function App() {
       (async () => {
         const recipients = await selectedMessage.message.getRecipients();
         setMessageDetail({
-          to: recipients.filter(r => r.recipientType === 1).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
-          cc: recipients.filter(r => r.recipientType === 2).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
-          bcc: recipients.filter(r => r.recipientType === 3).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
+          to: recipients.filter(r => r.recipientType === Consts.MAPI_TO).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
+          cc: recipients.filter(r => r.recipientType === Consts.MAPI_CC).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
+          bcc: recipients.filter(r => r.recipientType === Consts.MAPI_BCC).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
           attachments: (await selectedMessage.message.getAttachments()).map(convertAttachmentToSummary),
           body: await selectedMessage.message.body,
         });
