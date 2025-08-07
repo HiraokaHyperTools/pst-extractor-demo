@@ -7,5 +7,6 @@ export default defineConfig({
   plugins: [react(), nodePolyfills()],
   build: {
     outDir: 'docs',
-  }
+  },
+  base: '/pst-extractor-demo/',
 });
