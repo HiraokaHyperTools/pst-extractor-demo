@@ -7,7 +7,6 @@ import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
-import MenuIcon from '@mui/icons-material/Menu';
 import ListSubheader from '@mui/material/ListSubheader';
 import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -22,11 +21,17 @@ import ListItem from '@mui/material/ListItem';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import Paper from '@mui/material/Paper';
 import LinearProgress from '@mui/material/LinearProgress';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import HomeIcon from '@mui/icons-material/Home';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CardActions from '@mui/material/CardActions';
+import AttachEmailIcon from '@mui/icons-material/AttachEmail';
+import EventIcon from '@mui/icons-material/Event';
+
 
 type PstLoader = {
   pstFile: PSTFile,
@@ -54,6 +59,7 @@ type AttachmentSummary = {
   displayName: string,
   provideFile: (() => Promise<ArrayBuffer | null>) | null,
   provideEmbedded: (() => Promise<PSTMessage | null>) | null,
+  toJSON: () => any,
 };
 type MessageDetail = {
   to: ContactSummary[],
@@ -61,16 +67,22 @@ type MessageDetail = {
   bcc: ContactSummary[],
   attachments: AttachmentSummary[],
   body: string,
+  moreProperties: Map<string, string>,
+};
+type ShowPropertiesPage = {
+  moreProperties: Map<string, string>,
 };
 type NavigationStackItem = {
   displayName: string,
   onClick: () => void,
+  onLeave: () => void,
 };
 type NextCommand = {
   backToAllFoldersList?: boolean,
   setSelectedFolder?: FlattenFolder,
   setSelectedMessage?: MessageSummary,
-  setOpenTask?: boolean,
+  performOpenPst?: boolean,
+  performShowProperties?: { toJSON: () => any, displayName: string },
 };
 
 let justIndex = 0;
@@ -120,6 +132,7 @@ export default function App() {
   const [messageDetail, setMessageDetail] = React.useState<MessageDetail | null>(null);
   const [navigationStack, setNavigationStack] = React.useState<NavigationStackItem[]>([]);
   const [nextCommand, setNextCommand] = React.useState<NextCommand>({});
+  const [showProperties, setShowProperties] = React.useState<ShowPropertiesPage | null>(null);
 
   function eject() {
     setFile(null);
@@ -128,33 +141,37 @@ export default function App() {
     setFlattenFolders([]);
     setSelectedFolder(null);
     setMessages(null);
-    setSelectedMessage(null);
-    setMessageDetail(null);
     setNavigationStack([]);
     justIndex = 0;
+  }
+
+  function closeMessageView() {
+    setSelectedMessage(null);
+    setMessageDetail(null);
+  }
+  function closeMessageList() {
+    setMessages(null);
+    setSelectedFolder(null);
+    closeMessageView();
   }
 
   React.useEffect(() => {
     if (nextCommand) {
       if (nextCommand.backToAllFoldersList) {
-        setMessages(null);
-        setSelectedFolder(null);
-        setSelectedMessage(null);
-        setMessageDetail(null);
+        closeMessageList();
       }
       if (nextCommand.setSelectedFolder) {
         if (selectedFolder !== nextCommand.setSelectedFolder) {
           setSelectedFolder(nextCommand.setSelectedFolder);
         }
         else {
-          setSelectedMessage(null);
-          setMessageDetail(null);
+          closeMessageView();
         }
       }
       if (nextCommand.setSelectedMessage) {
         setSelectedMessage(nextCommand.setSelectedMessage);
       }
-      if (nextCommand.setOpenTask) {
+      if (nextCommand.performOpenPst) {
         setOpenTask((async () => {
           if (file) {
             const pstFile = await openPst(
@@ -182,6 +199,23 @@ export default function App() {
           }
         })());
       }
+      if (nextCommand.performShowProperties) {
+        const { toJSON } = nextCommand.performShowProperties;
+        const props = Object.entries(toJSON())
+          .map(pair => [pair[0] + "", pair[1] + ""] as [string, string])
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          ;
+        setShowProperties({
+          moreProperties: new Map<string, string>(props),
+        });
+        setNavigationStack(navigationStack.concat({
+          displayName: nextCommand.performShowProperties.displayName,
+          onClick: () => setNextCommand(nextCommand),
+          onLeave: () => {
+            setShowProperties(null);
+          },
+        }));
+      }
     }
   }, [nextCommand]);
 
@@ -199,6 +233,7 @@ export default function App() {
       )
         ? async () => { return att.getEmbeddedPSTMessage() || null; }
         : null,
+      toJSON: () => att.toJSON(),
     });
   }
 
@@ -206,12 +241,17 @@ export default function App() {
     if (selectedMessage) {
       (async () => {
         const recipients = await selectedMessage.message.getRecipients();
+        const props = Object.entries(selectedMessage.message.toJSON())
+          .map(pair => [pair[0] + "", pair[1] + ""] as [string, string])
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          ;
         setMessageDetail({
           to: recipients.filter(r => r.recipientType === Consts.MAPI_TO).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
           cc: recipients.filter(r => r.recipientType === Consts.MAPI_CC).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
           bcc: recipients.filter(r => r.recipientType === Consts.MAPI_BCC).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
           attachments: (await selectedMessage.message.getAttachments()).map(convertAttachmentToSummary),
           body: await selectedMessage.message.body,
+          moreProperties: new Map<string, string>(props),
         });
       })();
     } else {
@@ -246,8 +286,11 @@ export default function App() {
           setFlattenFolders(flattenFolders);
 
           setNavigationStack(navigationStack.concat({
-            displayName: "All folders list",
-            onClick: () => setNextCommand({ backToAllFoldersList: true })
+            displayName: pstLoader.name,
+            onClick: () => setNextCommand({ backToAllFoldersList: true }),
+            onLeave: () => {
+              // no need to do anything here
+            }
           }));
         }
       }
@@ -272,9 +315,7 @@ export default function App() {
   }
 
   React.useEffect(() => {
-    setMessages(null);
-    setSelectedMessage(null);
-    setMessageDetail(null);
+    closeMessageView();
 
     if (selectedFolder) {
       (async () => {
@@ -282,6 +323,8 @@ export default function App() {
         const emails = await folder.getEmails();
         setMessages(emails.map(summaryMessageFromPSTMessage));
       })();
+    } else {
+      setMessages(null);
     }
   }, [selectedFolder]);
 
@@ -302,21 +345,27 @@ export default function App() {
     }
   }
 
-  function enterToFolder(folder: FlattenFolder) {
+  function browseFolder(folder: FlattenFolder) {
     setSelectedFolder(folder);
 
     setNavigationStack(navigationStack.concat({
       displayName: folder.name,
-      onClick: () => setNextCommand({ setSelectedFolder: folder })
+      onClick: () => setNextCommand({ setSelectedFolder: folder }),
+      onLeave: () => {
+        setSelectedFolder(null);
+      }
     }));
   }
 
-  function enterToMessage(message: MessageSummary) {
+  function browseMessage(message: MessageSummary) {
     setSelectedMessage(message);
 
     setNavigationStack(navigationStack.concat({
       displayName: message.subject,
-      onClick: () => setNextCommand({ setSelectedMessage: message })
+      onClick: () => setNextCommand({ setSelectedMessage: message }),
+      onLeave: () => {
+        closeMessageView();
+      }
     }));
   }
 
@@ -324,13 +373,24 @@ export default function App() {
     if (provideEmbedded) {
       const embeddedMessage = await provideEmbedded();
       if (embeddedMessage) {
-        enterToMessage(summaryMessageFromPSTMessage(embeddedMessage));
+        browseMessage(summaryMessageFromPSTMessage(embeddedMessage));
       }
     }
   }
 
-  function tryToOpen() {
-    setNextCommand({ setOpenTask: true });
+  function tryToOpenPst() {
+    setNextCommand({ performOpenPst: true });
+  }
+
+  function goBack() {
+    if (2 <= navigationStack.length) {
+      const leaving = navigationStack[navigationStack.length - 1];
+      leaving.onLeave();
+      const newStack = navigationStack.slice(0, -1);
+      setNavigationStack(newStack);
+      const lastItem = newStack[newStack.length - 1];
+      lastItem.onClick();
+    }
   }
 
   return pstLoader
@@ -344,12 +404,13 @@ export default function App() {
               color="inherit"
               aria-label="menu"
               sx={{ mr: 2 }}
-              onClick={() => setOpen(!open)}
+              onClick={() => goBack()}
             >
-              <MenuIcon />
+              {(2 <= navigationStack.length) ? <ArrowBackIcon /> : <HomeIcon />}
             </IconButton>
+
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              {pstLoader.name}
+              {(1 <= navigationStack.length) ? navigationStack[navigationStack.length - 1].displayName : "(Unmounted)"}
             </Typography>
 
             <Button color="inherit" onClick={() => eject()}>Eject</Button>
@@ -379,14 +440,44 @@ export default function App() {
         </Drawer>
 
         {
-          selectedMessage
-            ? messageDetail
-              ? <>
-                <TableContainer component={Paper}>
-                  <Table aria-label="message details table">
+          showProperties
+            ? <>
+              <Table size="small" aria-label="more-properties-table">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Property</TableCell>
+                    <TableCell>Value</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {
+                    Array.from(showProperties.moreProperties.entries()).map(([key, value]) => (
+                      <TableRow key={key}>
+                        <TableCell component="th" scope="row">{key}</TableCell>
+                        <TableCell>{value}</TableCell>
+                      </TableRow>
+                    ))
+                  }
+                </TableBody>
+              </Table>
+            </>
+            : selectedMessage
+              ? messageDetail
+                ? <>
+                  <Box sx={{ px: 1 }}>
+                    <Button variant="text" onClick={() => setNextCommand({
+                      performShowProperties:
+                      {
+                        toJSON: () => selectedMessage.message.toJSON(),
+                        displayName: `Properties of message: ${selectedMessage.message.subject}`
+                      }
+                    })}>Show message's full properties</Button>
+                  </Box>
+
+                  <Table aria-label="message details table" size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>Item</TableCell>
+                        <TableCell>Message header</TableCell>
                         <TableCell>Contents</TableCell>
                       </TableRow>
                     </TableHead>
@@ -419,122 +510,165 @@ export default function App() {
                         sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                       >
                         <TableCell component="th" scope="row">Attachments</TableCell>
-                        <TableCell>{messageDetail.attachments.map(
-                          att =>
-                            att.provideFile
-                              ? <p><i>{att.displayName}</i> (<a href="javascript:void(0);" onClick={() => proceedDownload(att.provideFile, att.displayName)}>Download</a>)</p>
-                              : att.provideEmbedded
-                                ? <p><i>{att.displayName} (<a href="javascript:void(0);" onClick={() => proceedView(att.provideEmbedded)}>View</a>)</i></p>
-                                : <p><i>{att.displayName} (Unknown)</i></p>
-
-                        )}</TableCell>
+                        <TableCell>
+                          <Box
+                            sx={{
+                              width: '100%',
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px, 100%), 1fr))',
+                              gap: 2,
+                            }}
+                          >
+                            {messageDetail.attachments.map(
+                              att => <Card variant="outlined" key={att.displayName}>
+                                <CardContent>
+                                  <Typography gutterBottom sx={{ color: 'text.secondary', fontSize: 14 }}>
+                                    {att.displayName}
+                                  </Typography>
+                                </CardContent>
+                                <CardActions>
+                                  {att.provideFile
+                                    ? <Button onClick={() => proceedDownload(att.provideFile, att.displayName)} size="small">Download</Button>
+                                    : att.provideEmbedded
+                                      ? <Button onClick={() => proceedView(att.provideEmbedded)} size="small">View</Button>
+                                      : <span>(Unknown)</span>
+                                  }
+                                  <Button onClick={() => setNextCommand({
+                                    performShowProperties:
+                                    {
+                                      toJSON: () => att.toJSON(),
+                                      displayName: `Properties of attachment: ${att.displayName}`
+                                    }
+                                  })} color="secondary" size="small">Properties</Button>
+                                </CardActions>
+                              </Card>
+                            )}
+                          </Box>
+                        </TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
-                </TableContainer>
 
-                <Box sx={{ p: 2 }}>
-                  <Typography variant="h6">Body</Typography>
-                  <div>{messageDetail.body}</div>
-                </Box>
-              </>
-              : <>
-                <Typography variant="body1" gutterBottom>
-                  Loading message details in progress ...
-                </Typography>
-                <Box sx={{ width: '100%' }}>
-                  <LinearProgress />
-                </Box>
+                  <Box sx={{ p: 2 }}>
+                    <Typography variant="h6">Body</Typography>
+                    <div>{messageDetail.body}</div>
+                  </Box>
+                </>
+                : <>
+                  <Typography variant="body1" gutterBottom>
+                    Loading message details in progress ...
+                  </Typography>
+                  <Box sx={{ width: '100%' }}>
+                    <LinearProgress />
+                  </Box>
 
-              </>
-            :
-            selectedFolder
-              ? messages
-                ?
-                <>
-                  <List
-                    sx={{ width: '100%', bgcolor: 'background.paper' }}
-                    component="nav"
-                    aria-labelledby="messages-subheader"
-                    subheader={
-                      <ListSubheader component="div" id="messages-subheader">
-                        Messages list
-                      </ListSubheader>
-                    }
-                  >
-                    {
-                      messages.map(
-                        it => <ListItemButton
-                          key={it.key}
-                          onClick={() => {
-                            enterToMessage(it);
-                          }}
-                        >
-                          {
-                            it.messageClass === "IPM.Note"
-                              ? <ListItemIcon>
-                                <MailIcon />
-                              </ListItemIcon>
-                              : it.messageClass === "IPM.Contact"
+                </>
+              :
+              selectedFolder
+                ? messages
+                  ?
+                  <>
+                    <Box sx={{ px: 1 }}>
+                      <Button variant="text" onClick={() => setNextCommand({
+                        performShowProperties:
+                        {
+                          toJSON: () => selectedFolder.folder.toJSON(),
+                          displayName: `Properties of folder: ${selectedFolder.name}`
+                        }
+                      })}>Show folder's full properties</Button>
+                    </Box>
+                    <List
+                      sx={{ width: '100%', bgcolor: 'background.paper' }}
+                      component="nav"
+                      aria-labelledby="messages-subheader"
+                      subheader={
+                        <ListSubheader component="div" id="messages-subheader">
+                          Messages list
+                        </ListSubheader>
+                      }
+                    >
+                      {
+                        messages.map(
+                          it => <ListItemButton
+                            key={it.key}
+                            onClick={() => {
+                              browseMessage(it);
+                            }}
+                          >
+                            {
+                              it.messageClass === "IPM.Note"
                                 ? <ListItemIcon>
-                                  <PersonIcon />
+                                  <MailIcon />
                                 </ListItemIcon>
-                                : <ListItemIcon>
-                                  <QuestionMarkIcon />
-                                </ListItemIcon>
-                          }
-                          <ListItemText primary={it.subject} />
-                        </ListItemButton>
-                      )
-                    }
-                  </List>
-                </>
-                : <>
-                  <Typography variant="body1" gutterBottom>
-                    Loading emails in progress ...
-                  </Typography>
-                  <Box sx={{ width: '100%' }}>
-                    <LinearProgress />
-                  </Box>
+                                : it.messageClass === "IPM.Contact"
+                                  ? <ListItemIcon>
+                                    <PersonIcon />
+                                  </ListItemIcon>
+                                  : it.messageClass === "IPM.Appointment"
+                                    ? <ListItemIcon>
+                                      <EventIcon />
+                                    </ListItemIcon>
+                                    : it.messageClass.indexOf("IPM.Document") === 0
+                                      // `IPM.Document.jpegfile`, `IPM.Document.AcroExch.Document`, `IPM.Document.Word.Document.12` or similar
+                                      ? <ListItemIcon>
+                                        <AttachEmailIcon />
+                                      </ListItemIcon>
+                                      : <ListItemIcon>
+                                        <QuestionMarkIcon />
+                                      </ListItemIcon>
+                            }
+                            <ListItemText primary={it.subject} />
+                          </ListItemButton>
+                        )
+                      }
+                    </List>
+                  </>
+                  : <>
+                    <Typography variant="body1" gutterBottom>
+                      Loading emails in progress ...
+                    </Typography>
+                    <Box sx={{ width: '100%' }}>
+                      <LinearProgress />
+                    </Box>
 
-                </>
-              : flattenFolders.length
-                ? <>
-                  <List
-                    sx={{ width: '100%', bgcolor: 'background.paper' }}
-                    component="nav"
-                    aria-labelledby="all-folders-subheader"
-                    subheader={
-                      <ListSubheader component="div" id="all-folders-subheader">
-                        All folders list
-                      </ListSubheader>
-                    }
-                  >
-                    {
-                      flattenFolders.map(
-                        it => <ListItemButton
-                          key={it.key}
-                          sx={{ pl: 2 + it.depth * 2 }}
-                          onClick={() => {
-                            enterToFolder(it);
-                          }} >
-                          <ListItemIcon>
-                            <FolderIcon />
-                          </ListItemIcon>
-                          <ListItemText primary={it.name} secondary={it.sub} />
-                        </ListItemButton>
-                      )
-                    }
-                  </List>
-                </>
-                : <>
-                  <Typography variant="body1" gutterBottom>
-                    Loading folder list in progress ...
-                  </Typography>
-                  <Box sx={{ width: '100%' }}>
-                    <LinearProgress />
-                  </Box>
-                </>
+                  </>
+                : flattenFolders.length
+                  ? <>
+                    <List
+                      sx={{ width: '100%', bgcolor: 'background.paper' }}
+                      component="nav"
+                      aria-labelledby="all-folders-subheader"
+                      subheader={
+                        <ListSubheader component="div" id="all-folders-subheader">
+                          All folders list
+                        </ListSubheader>
+                      }
+                    >
+                      {
+                        flattenFolders.map(
+                          it => <ListItemButton
+                            key={it.key}
+                            sx={{ pl: 2 + it.depth * 2 }}
+                            onClick={() => {
+                              browseFolder(it);
+                            }} >
+                            <ListItemIcon>
+                              <FolderIcon />
+                            </ListItemIcon>
+                            <ListItemText primary={it.name} secondary={it.sub} />
+                          </ListItemButton>
+                        )
+                      }
+                    </List>
+                  </>
+                  : <>
+                    <Typography variant="body1" gutterBottom>
+                      Loading folder list in progress ...
+                    </Typography>
+                    <Box sx={{ width: '100%' }}>
+                      <LinearProgress />
+                    </Box>
+                  </>
         }
       </Box >
     </>
@@ -558,7 +692,7 @@ export default function App() {
             <TaskObserver
               task={openTask}
               idle={() =>
-                <button onClick={() => tryToOpen()}>Open</button>
+                <button onClick={() => tryToOpenPst()}>Open</button>
               }
               loading={() =>
                 <>
@@ -569,7 +703,7 @@ export default function App() {
               }
               error={ex => <>
                 <pre>{ex.message}</pre>
-                <button onClick={() => tryToOpen()}>Open</button>
+                <button onClick={() => tryToOpenPst()}>Open</button>
               </>}
               success={() =>
                 <>File opened successfully</>
