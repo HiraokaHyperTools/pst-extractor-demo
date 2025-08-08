@@ -31,6 +31,7 @@ import CardContent from '@mui/material/CardContent';
 import CardActions from '@mui/material/CardActions';
 import AttachEmailIcon from '@mui/icons-material/AttachEmail';
 import EventIcon from '@mui/icons-material/Event';
+import MailLockIcon from '@mui/icons-material/MailLock';
 
 
 type PstLoader = {
@@ -47,12 +48,13 @@ type FlattenFolder = {
 type ContactSummary = {
   address: string,
   name: string,
+  toJSON: () => any,
 };
 type MessageSummary = {
   key: string,
   subject: string,
   messageClass: string,
-  from: ContactSummary,
+  from?: ContactSummary,
   message: PSTMessage,
 };
 type AttachmentSummary = {
@@ -85,7 +87,33 @@ type NextCommand = {
   performShowProperties?: { toJSON: () => any, displayName: string },
 };
 
+const ipmIconProvider: { pattern: RegExp, icon: React.JSX.Element }[] = [
+  { pattern: /^IPM\.Note$/, icon: <MailIcon /> },
+  { pattern: /^IPM\.Note\.SMIME$/, icon: <MailLockIcon /> },
+  { pattern: /^IPM\.Contact$/, icon: <PersonIcon /> },
+  { pattern: /^IPM\.Appointment$/, icon: <EventIcon /> },
+  { pattern: /^IPM\.Schedule/, icon: <EventIcon /> },
+  { pattern: /^IPM\.Document/, icon: <AttachEmailIcon /> },
+  { pattern: /^/, icon: <QuestionMarkIcon /> }, // fallback icon
+];
+
 let justIndex = 0;
+
+function RenderContactSummary(props: { contact: ContactSummary, onClickProperties?: () => void }) {
+  return <Card variant="outlined">
+    <CardContent>
+      <Typography gutterBottom sx={{ color: 'text.secondary', fontSize: 14 }}>
+        {props.contact.name}
+      </Typography>
+    </CardContent>
+    {props.onClickProperties
+      ? <CardActions>
+        <Button onClick={props.onClickProperties} color="secondary" size="small">Properties</Button>
+      </CardActions>
+      : null
+    }
+  </Card>;
+}
 
 function TaskObserver(props: {
   task: PromiseLike<void> | null,
@@ -203,6 +231,7 @@ export default function App() {
         const { toJSON } = nextCommand.performShowProperties;
         const props = Object.entries(toJSON())
           .map(pair => [pair[0] + "", pair[1] + ""] as [string, string])
+          .filter(pair => pair[0] !== "toJSON")
           .sort((a, b) => a[0].localeCompare(b[0]))
           ;
         setShowProperties({
@@ -246,9 +275,9 @@ export default function App() {
           .sort((a, b) => a[0].localeCompare(b[0]))
           ;
         setMessageDetail({
-          to: recipients.filter(r => r.recipientType === Consts.MAPI_TO).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
-          cc: recipients.filter(r => r.recipientType === Consts.MAPI_CC).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
-          bcc: recipients.filter(r => r.recipientType === Consts.MAPI_BCC).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName)),
+          to: recipients.filter(r => r.recipientType === Consts.MAPI_TO).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName, r.toJSON)),
+          cc: recipients.filter(r => r.recipientType === Consts.MAPI_CC).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName, r.toJSON)),
+          bcc: recipients.filter(r => r.recipientType === Consts.MAPI_BCC).map(r => composeContactSummaryFrom(r.addrType, r.emailAddress, r.displayName, r.toJSON)),
           attachments: (await selectedMessage.message.getAttachments()).map(convertAttachmentToSummary),
           body: await selectedMessage.message.body,
           moreProperties: new Map<string, string>(props),
@@ -297,10 +326,11 @@ export default function App() {
     })();
   }, [pstLoader]);
 
-  function composeContactSummaryFrom(addrType: string, emailAddress: string, name: string): ContactSummary {
+  function composeContactSummaryFrom(addrType: string, emailAddress: string, name: string, toJSON: () => any): ContactSummary {
     return {
       address: `${addrType}: ${emailAddress}`,
       name: name,
+      toJSON: toJSON,
     };
   }
 
@@ -309,7 +339,9 @@ export default function App() {
       key: `_${justIndex++}`,
       subject: message.subject,
       messageClass: message.messageClass,
-      from: composeContactSummaryFrom(message.senderAddrtype, message.senderEmailAddress, message.senderName),
+      from: message.senderAddrtype
+        ? composeContactSummaryFrom(message.senderAddrtype, message.senderEmailAddress, message.senderName, message.toJSON)
+        : undefined,
       message: message,
     };
   }
@@ -482,19 +514,61 @@ export default function App() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
+                      <TableRow key="sender">
+                        <TableCell component="th" scope="row">Sender</TableCell>
+                        <TableCell>
+                          {selectedMessage.from
+                            ? <Box
+                              sx={{
+                                width: '100%',
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px, 100%), 1fr))',
+                                gap: 2,
+                              }}
+                            >
+                              <RenderContactSummary
+                                contact={selectedMessage.from}
+                              />
+                            </Box>
+                            : null
+                          }
+                        </TableCell>
+                      </TableRow>
                       {[
                         { name: "To", list: messageDetail.to },
                         { name: "Cc", list: messageDetail.cc },
                         { name: "Bcc", list: messageDetail.bcc }
-                      ].map((row) => (
+                      ].map((category) => (
                         <TableRow
-                          key={row.name}
+                          key={category.name}
                           sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                         >
-                          <TableCell component="th" scope="row">{row.name}</TableCell>
-                          <TableCell>{row.list.map(
-                            one => <p><i>{one.name} &lt;{one.address}&gt;</i></p>
-                          )}</TableCell>
+                          <TableCell component="th" scope="row">{category.name}</TableCell>
+                          <TableCell>
+                            <Box
+                              sx={{
+                                width: '100%',
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px, 100%), 1fr))',
+                                gap: 2,
+                              }}
+                            >
+                              {category.list.map(
+                                one =>
+                                  <RenderContactSummary
+                                    key={justIndex++}
+                                    contact={one}
+                                    onClickProperties={() => setNextCommand({
+                                      performShowProperties:
+                                      {
+                                        toJSON: () => one.toJSON(),
+                                        displayName: `Properties of contact: ${one.name}`
+                                      }
+                                    })}
+                                  />
+                              )}
+                            </Box>
+                          </TableCell>
                         </TableRow>
                       ))}
                       <TableRow
@@ -551,7 +625,7 @@ export default function App() {
 
                   <Box sx={{ p: 2 }}>
                     <Typography variant="h6">Body</Typography>
-                    <div>{messageDetail.body}</div>
+                    <Typography component="pre" sx={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>{messageDetail.body}</Typography>
                   </Box>
                 </>
                 : <>
@@ -596,26 +670,9 @@ export default function App() {
                             }}
                           >
                             {
-                              it.messageClass === "IPM.Note"
-                                ? <ListItemIcon>
-                                  <MailIcon />
-                                </ListItemIcon>
-                                : it.messageClass === "IPM.Contact"
-                                  ? <ListItemIcon>
-                                    <PersonIcon />
-                                  </ListItemIcon>
-                                  : it.messageClass === "IPM.Appointment"
-                                    ? <ListItemIcon>
-                                      <EventIcon />
-                                    </ListItemIcon>
-                                    : it.messageClass.indexOf("IPM.Document") === 0
-                                      // `IPM.Document.jpegfile`, `IPM.Document.AcroExch.Document`, `IPM.Document.Word.Document.12` or similar
-                                      ? <ListItemIcon>
-                                        <AttachEmailIcon />
-                                      </ListItemIcon>
-                                      : <ListItemIcon>
-                                        <QuestionMarkIcon />
-                                      </ListItemIcon>
+                              ipmIconProvider
+                                .filter(ipm => ipm.pattern.test(it.messageClass))
+                                .map(it => <ListItemIcon>{it.icon}</ListItemIcon>)[0]
                             }
                             <ListItemText primary={it.subject} />
                           </ListItemButton>
@@ -625,7 +682,7 @@ export default function App() {
                   </>
                   : <>
                     <Typography variant="body1" gutterBottom>
-                      Loading emails in progress ...
+                      Loading messages in progress ...
                     </Typography>
                     <Box sx={{ width: '100%' }}>
                       <LinearProgress />
