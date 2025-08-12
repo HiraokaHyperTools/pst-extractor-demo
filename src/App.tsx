@@ -840,6 +840,13 @@ export default function App() {
               }
             />
           </p>
+          <br />
+          <div>---</div>
+          <p style={{ fontStyle: 'italic', color: 'gray' }}>
+            v{APP_VERSION}
+            <span style={{ margin: '0 1ex' }}>-</span>
+            <a href="https://github.com/HiraokaHyperTools/pst-extractor-demo" target='blank'>GitHub</a>
+          </p>
         </Box>
       </Container >
     </>
