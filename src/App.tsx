@@ -35,6 +35,7 @@ import MailLockIcon from '@mui/icons-material/MailLock';
 import { toEmlFrom, toVCardStrFrom } from '@hiraokahypertools/pst_to_eml';
 import { encode } from 'iconv-lite';
 import 'setimmediate';
+import { convertToMsg } from '@hiraokahypertools/pst_to_msg';
 
 
 type PstLoader = {
@@ -73,7 +74,7 @@ type MessageDetail = {
   attachments: AttachmentSummary[],
   body: string,
   moreProperties: Map<string, string>,
-  exportTo: ExportTo | undefined,
+  exportTo: ExportTo[],
 };
 type ShowPropertiesPage = {
   moreProperties: Map<string, string>,
@@ -260,7 +261,7 @@ export default function App() {
       if (nextCommand.performShowProperties) {
         const { toJSON } = nextCommand.performShowProperties;
         const props = Object.entries(toJSON())
-          .map(pair => [pair[0] + "", pair[1] + ""] as [string, string])
+          .map(pair => [pair[0] + "", pair[1] + ""] satisfies [string, string])
           .filter(pair => pair[0] !== "toJSON")
           .sort((a, b) => a[0].localeCompare(b[0]))
           ;
@@ -304,7 +305,7 @@ export default function App() {
       (async () => {
         const recipients = await selectedMessage.message.getRecipients();
         const props = Object.entries(selectedMessage.message.toJSON())
-          .map(pair => [pair[0] + "", pair[1] + ""] as [string, string])
+          .map(pair => [pair[0] + "", pair[1] + ""] satisfies [string, string])
           .sort((a, b) => a[0].localeCompare(b[0]))
           ;
         setMessageDetail({
@@ -314,16 +315,28 @@ export default function App() {
           attachments: (await selectedMessage.message.getAttachments()).map(convertAttachmentToSummary),
           body: await selectedMessage.message.body,
           moreProperties: new Map<string, string>(props),
-          exportTo: (selectedMessage.messageClass === "IPM.Note")
-            ? {
-              provide: async () => {
-                return await toEmlFrom({}, selectedMessage.message);
-              },
-              mediaType: 'message/rfc822',
-              actionDisplay: 'Export to EML',
-              fileName: `${normFileName(selectedMessage.message.subject)}.eml`
-            }
-            : (selectedMessage.message instanceof PSTContact)
+          exportTo: [
+            pstLoader?.pstFile
+              ? {
+                provide: async () => {
+                  return await convertToMsg(selectedMessage.message, pstLoader?.pstFile);
+                },
+                mediaType: 'application/octet-stream',
+                actionDisplay: 'Export to MSG',
+                fileName: `${normFileName(selectedMessage.message.subject)}.msg`
+              } satisfies ExportTo
+              : null,
+            (selectedMessage.messageClass === "IPM.Note")
+              ? {
+                provide: async () => {
+                  return await toEmlFrom({}, selectedMessage.message);
+                },
+                mediaType: 'message/rfc822',
+                actionDisplay: 'Export to EML',
+                fileName: `${normFileName(selectedMessage.message.subject)}.eml`
+              } satisfies ExportTo
+              : null,
+            (selectedMessage.message instanceof PSTContact)
               ? {
                 provide: async () => {
                   return encode(await toVCardStrFrom({}, selectedMessage.message as PSTContact), 'UTF-8');
@@ -331,8 +344,10 @@ export default function App() {
                 mediaType: 'text/x-vcard',
                 actionDisplay: 'Export to VCard',
                 fileName: `${normFileName(selectedMessage.message.displayName)}.vcf`
-              }
-              : undefined,
+              } satisfies ExportTo
+              : null
+          ]
+            .filter(it => it !== null),
         });
       })();
     } else {
@@ -557,12 +572,11 @@ export default function App() {
                       }
                     })}>Show message's full properties</Button>
 
-                    {messageDetail.exportTo
-                      ? <Button variant="text" onClick={() => setNextCommand({ exportTo: messageDetail.exportTo, })}>
-                        {messageDetail.exportTo.actionDisplay}
+                    {messageDetail.exportTo.map(
+                      exportTo => <Button variant="text" onClick={() => setNextCommand({ exportTo: exportTo, })}>
+                        {exportTo.actionDisplay}
                       </Button>
-                      : <></>
-                    }
+                    )}
                   </Box>
 
                   <Table aria-label="message details table" size="small">
