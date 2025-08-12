@@ -1,6 +1,6 @@
 {
   "name": "pst-extractor-demo",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,15 +11,19 @@
   "dependencies": {
     "@emotion/react": "latest",
     "@emotion/styled": "latest",
-    "@hiraokahypertools/pst-extractor": "^0.1.0-alpha.14",
+    "@hiraokahypertools/pst-extractor": "^0.1.0-alpha.20",
+    "@hiraokahypertools/pst_to_eml": "^0.1.0-alpha.10",
     "@mui/icons-material": "latest",
     "@mui/material": "latest",
+    "iconv-lite": "^0.6.3",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "setimmediate": "^1.0.5"
   },
   "devDependencies": {
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@types/setimmediate": "^1.0.4",
     "@vitejs/plugin-react": "latest",
     "typescript": "latest",
     "vite": "latest",

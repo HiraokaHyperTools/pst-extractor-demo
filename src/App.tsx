@@ -2,7 +2,7 @@ import * as React from 'react';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import { Consts, openPst, PSTAttachment, PSTFile, PSTFolder, PSTMessage } from '@hiraokahypertools/pst-extractor';
+import { Consts, openPst, PSTAttachment, PSTContact, PSTFile, PSTFolder, PSTMessage } from '@hiraokahypertools/pst-extractor';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Button from '@mui/material/Button';
@@ -32,6 +32,9 @@ import CardActions from '@mui/material/CardActions';
 import AttachEmailIcon from '@mui/icons-material/AttachEmail';
 import EventIcon from '@mui/icons-material/Event';
 import MailLockIcon from '@mui/icons-material/MailLock';
+import { toEmlFrom, toVCardStrFrom } from '@hiraokahypertools/pst_to_eml';
+import { encode } from 'iconv-lite';
+import 'setimmediate';
 
 
 type PstLoader = {
@@ -70,6 +73,7 @@ type MessageDetail = {
   attachments: AttachmentSummary[],
   body: string,
   moreProperties: Map<string, string>,
+  exportTo: ExportTo | undefined,
 };
 type ShowPropertiesPage = {
   moreProperties: Map<string, string>,
@@ -79,12 +83,19 @@ type NavigationStackItem = {
   onClick: () => void,
   onLeave: () => void,
 };
+type ExportTo = {
+  provide: () => Promise<Uint8Array>,
+  fileName: string,
+  mediaType: string,
+  actionDisplay: string,
+};
 type NextCommand = {
   backToAllFoldersList?: boolean,
   setSelectedFolder?: FlattenFolder,
   setSelectedMessage?: MessageSummary,
   performOpenPst?: boolean,
   performShowProperties?: { toJSON: () => any, displayName: string },
+  exportTo?: ExportTo,
 };
 
 const ipmIconProvider: { pattern: RegExp, icon: React.JSX.Element }[] = [
@@ -183,6 +194,25 @@ export default function App() {
     closeMessageView();
   }
 
+  function downloadAs(exportTo: ExportTo): void {
+    proceedDownload(
+      () =>
+        (async () => {
+          const array = await exportTo.provide();
+          const arrayBuffer = new ArrayBuffer(array.byteLength);
+          const view = new Uint8Array(arrayBuffer);
+          view.set(array);
+          return arrayBuffer;
+        })(),
+      exportTo.fileName,
+      exportTo.mediaType
+    );
+  }
+
+  function normFileName(fileName: string): string {
+    return fileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
+  }
+
   React.useEffect(() => {
     if (nextCommand) {
       if (nextCommand.backToAllFoldersList) {
@@ -245,6 +275,9 @@ export default function App() {
           },
         }));
       }
+      if (nextCommand.exportTo) {
+        downloadAs(nextCommand.exportTo);
+      }
     }
   }, [nextCommand]);
 
@@ -281,6 +314,25 @@ export default function App() {
           attachments: (await selectedMessage.message.getAttachments()).map(convertAttachmentToSummary),
           body: await selectedMessage.message.body,
           moreProperties: new Map<string, string>(props),
+          exportTo: (selectedMessage.messageClass === "IPM.Note")
+            ? {
+              provide: async () => {
+                return await toEmlFrom({}, selectedMessage.message);
+              },
+              mediaType: 'message/rfc822',
+              actionDisplay: 'Export to EML',
+              fileName: `${normFileName(selectedMessage.message.subject)}.eml`
+            }
+            : (selectedMessage.message instanceof PSTContact)
+              ? {
+                provide: async () => {
+                  return encode(await toVCardStrFrom({}, selectedMessage.message as PSTContact), 'UTF-8');
+                },
+                mediaType: 'text/x-vcard',
+                actionDisplay: 'Export to VCard',
+                fileName: `${normFileName(selectedMessage.message.displayName)}.vcf`
+              }
+              : undefined,
         });
       })();
     } else {
@@ -360,11 +412,11 @@ export default function App() {
     }
   }, [selectedFolder]);
 
-  async function proceedDownload(provideFile: (() => Promise<ArrayBuffer | null>) | null, fileName: string) {
+  async function proceedDownload(provideFile: (() => Promise<ArrayBuffer | null>) | null, fileName: string, mediaType: string) {
     if (provideFile) {
       const fileData = await provideFile();
       if (fileData) {
-        const blob = new Blob([fileData], { type: "application/octet-stream" });
+        const blob = new Blob([fileData], { type: mediaType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -504,6 +556,13 @@ export default function App() {
                         displayName: `Properties of message: ${selectedMessage.message.subject}`
                       }
                     })}>Show message's full properties</Button>
+
+                    {messageDetail.exportTo
+                      ? <Button variant="text" onClick={() => setNextCommand({ exportTo: messageDetail.exportTo, })}>
+                        {messageDetail.exportTo.actionDisplay}
+                      </Button>
+                      : <></>
+                    }
                   </Box>
 
                   <Table aria-label="message details table" size="small">
@@ -602,7 +661,7 @@ export default function App() {
                                 </CardContent>
                                 <CardActions>
                                   {att.provideFile
-                                    ? <Button onClick={() => proceedDownload(att.provideFile, att.displayName)} size="small">Download</Button>
+                                    ? <Button onClick={() => proceedDownload(att.provideFile, att.displayName, "application/octet-stream")} size="small">Download</Button>
                                     : att.provideEmbedded
                                       ? <Button onClick={() => proceedView(att.provideEmbedded)} size="small">View</Button>
                                       : <span>(Unknown)</span>
