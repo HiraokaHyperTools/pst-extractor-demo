@@ -410,31 +410,31 @@
   resolved "https://registry.yarnpkg.com/@esbuild/win32-x64/-/win32-x64-0.25.8.tgz#610d7ea539d2fcdbe39237b5cc175eb2c4451f9c"
   integrity sha512-cn3Yr7+OaaZq1c+2pe+8yxC8E144SReCQjN6/2ynubzYjvyqZjTXfQJpAcQpsdJq3My7XADANiYGHoFC69pLQw==
 
-"@hiraokahypertools/pst-extractor@^0.1.0-alpha.20":
-  version "0.1.0-alpha.20"
-  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst-extractor/-/pst-extractor-0.1.0-alpha.20.tgz#89aa7a2f7c4172d873e9c80732e282c0b3637346"
-  integrity sha512-hf44G+Bj+jMGiRKYjWcEjznGkAppiR1f/d6PdSG5i/yOvGM6+/xPugTiED3cuMh+UgDgsBb0cA+HRPjMTgjFAA==
+"@hiraokahypertools/pst-extractor@^0.1.0-alpha.22":
+  version "0.1.0-alpha.22"
+  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst-extractor/-/pst-extractor-0.1.0-alpha.22.tgz#f88b8c35b6f1d727b64540ac8e74d8da5d661912"
+  integrity sha512-AsWYQNGfaiGMAN33543fyz6mU1xPxPNV+hGzz2rcGWIJfSUN7sZG4Bnrx9naEdPuxuguwnk++6VlbFTUHS61Lw==
   dependencies:
     iconv-lite "^0.6.3"
     long "^5.2.0"
     pako "^2.1.0"
 
-"@hiraokahypertools/pst_to_eml@^0.1.0-alpha.11":
-  version "0.1.0-alpha.11"
-  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst_to_eml/-/pst_to_eml-0.1.0-alpha.11.tgz#1ef6999e69123beea070a5d61114e5dfca98f999"
-  integrity sha512-bQ69RYWkGheDtBDe0wY2jhh4WjR08FESd8GNUnxIkORqS2uFWE3UE/Q1DH36wMDu06lZm7+RV0OTjuiaqzXebQ==
+"@hiraokahypertools/pst_to_eml@^0.1.0-alpha.13":
+  version "0.1.0-alpha.13"
+  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst_to_eml/-/pst_to_eml-0.1.0-alpha.13.tgz#38349db77b4bd74b948655edb7e7c39930f67b43"
+  integrity sha512-9D/AV/oewajtfTHHqlI+7HJnAnWfflOWVstsAbn3NE6CChDhEz8lzkyn2tNM5V9qKf/auc9/mrtxwHRWlUUe3A==
   dependencies:
-    "@hiraokahypertools/pst-extractor" "^0.1.0-alpha.20"
+    "@hiraokahypertools/pst-extractor" "^0.1.0-alpha.22"
     commander "^9.4.0"
     iconv-lite "^0.6.3"
     nodemailer "^7.0.5"
 
-"@hiraokahypertools/pst_to_msg@^0.1.0-alpha3":
-  version "0.1.0-alpha3"
-  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst_to_msg/-/pst_to_msg-0.1.0-alpha3.tgz#649bad93629965228ad94b86c65af0ccab410120"
-  integrity sha512-ytwf0w5HPlzxWAxzshDSaOKkwuGxAwLeNajb/ouAkDE6TGS/PKBQVGu6mkQQbkuj0VbNcBnKq4eV+JAJ2OV62A==
+"@hiraokahypertools/pst_to_msg@^0.1.0-alpha4":
+  version "0.1.0-alpha4"
+  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst_to_msg/-/pst_to_msg-0.1.0-alpha4.tgz#57e4c25217741365a7a88c46f7fce95a22f49906"
+  integrity sha512-vVhojKWzDXusHOq8W18D7yKwYzj2stySl090OnPsUaTwAw88lVcQF5OpU7kr+Z4egAKJ2iBsIeaNJuonwgxWzg==
   dependencies:
-    "@hiraokahypertools/pst-extractor" "^0.1.0-alpha.20"
+    "@hiraokahypertools/pst-extractor" "^0.1.0-alpha.22"
     "@kenjiuno/msgreader" "^1.25.0-beta1"
 
 "@jridgewell/gen-mapping@^0.3.12", "@jridgewell/gen-mapping@^0.3.5":
